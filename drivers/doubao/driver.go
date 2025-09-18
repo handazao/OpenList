@@ -3,6 +3,7 @@ package doubao
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -114,18 +115,10 @@ func (d *Doubao) Link(ctx context.Context, file model.Obj, args model.LinkArgs) 
 		case "get_file_url":
 			switch u.NodeType {
 			case VideoType, AudioType:
-				var r GetVideoFileUrlResp
-				_, err := d.request("/samantha/media/get_play_info", http.MethodPost, func(req *resty.Request) {
-					req.SetBody(base.Json{
-						"key":     u.Key,
-						"node_id": file.GetID(),
-					})
-				}, &r)
-				if err != nil {
-					return nil, err
-				}
-
-				downloadUrl = r.Data.OriginalMediaInfo.MainURL
+				// 把 key 和 node_id 拼接成一个字符串
+				downloadUrl = fmt.Sprintf("key=%s&node_id=%s", u.Key, file.GetID())
+				// 打印返回日志
+				fmt.Printf("get_file_url resp: %s\n", string(downloadUrl))
 			default:
 				var r GetFileUrlResp
 				_, err := d.request("/alice/message/get_file_url", http.MethodPost, func(req *resty.Request) {
@@ -146,7 +139,8 @@ func (d *Doubao) Link(ctx context.Context, file model.Obj, args model.LinkArgs) 
 
 		// 生成标准的Content-Disposition
 		contentDisposition := utils.GenerateContentDisposition(u.Name)
-
+		// 打印返回日志
+		fmt.Printf("model Link resp: %s\n", string(downloadUrl))
 		return &model.Link{
 			URL: downloadUrl,
 			Header: http.Header{
