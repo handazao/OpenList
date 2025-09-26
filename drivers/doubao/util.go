@@ -71,18 +71,34 @@ const (
 func (d *Doubao) request(path string, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
 	reqUrl := BaseURL + path
 	req := base.RestyClient.R()
-	req.SetHeader("Cookie", d.Cookie)
+	// 默认设置 Cookie
+	if d.Cookie != "" {
+		req.SetHeader("Cookie", d.Cookie)
+	}
+	// 如果调用方有额外处理，则执行
 	if callback != nil {
 		callback(req)
 	}
 
+	// 打印请求信息（手动日志，方便排查）
+	log.Infof(">>> Request >>>")
+	log.Infof("URL: %s", reqUrl)
+	log.Infof("Method: %s", method)
+	log.Infof("Headers: %+v", req.Header)
+	if req.Body != nil {
+		log.Infof("Body: %+v", req.Body)
+	}
+
 	var commonResp CommonResp
 
+	// 发送请求
 	res, err := req.Execute(method, reqUrl)
-	log.Debugln(res.String())
 	if err != nil {
 		return nil, err
 	}
+
+	// Debug 打印响应
+	log.Debugln("Response:", res.String())
 
 	body := res.Body()
 	// 先解析为通用响应

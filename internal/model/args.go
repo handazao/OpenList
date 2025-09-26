@@ -21,6 +21,7 @@ type LinkArgs struct {
 	Header   http.Header
 	Type     string
 	Redirect bool
+	Params   map[string]string
 }
 
 type Link struct {

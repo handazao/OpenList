@@ -298,6 +298,14 @@ func Link(ctx context.Context, storage driver.Driver, path string, args model.Li
 
 	var forget any
 	var linkM *model.Link
+	s := storage.GetStorage()
+	if s.Driver == "Doubao" {
+		// fmt.Printf("Driver struct: %+v\n", s.Remark)
+		// 将 Remark（JSON 字符串）转换成 http.Header
+		args.Header = utils.RemarkToHeader(s.Remark)
+		args.Params = utils.RemarkToParam(s.Remark)
+	}
+
 	fn := func() (*model.Link, error) {
 		link, err := storage.Link(ctx, file, args)
 		if err != nil {

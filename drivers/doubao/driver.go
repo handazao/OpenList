@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
+	"github.com/OpenListTeam/OpenList/v4/internal/db"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
@@ -113,12 +114,68 @@ func (d *Doubao) Link(ctx context.Context, file model.Obj, args model.LinkArgs) 
 
 			downloadUrl = r.Data.DownloadInfos[0].MainURL
 		case "get_file_url":
+			var redisKey = "file_url:" + u.Key
+			// 先尝试从 Redis 获取
+			downloadUrl, err := db.RedisGet(redisKey)
+			if err != nil {
+				return nil, err
+			}
+
+			if downloadUrl != "" {
+				// Redis 有缓存，直接返回
+				return &model.Link{URL: downloadUrl}, nil
+			}
+
+			switch u.NodeType {
+			case VideoType, AudioType:
+				var r GetVideoFileUrlResp
+				_, err := d.request("/samantha/media/get_play_info", http.MethodPost, func(req *resty.Request) {
+					// QueryParams 参数
+					req.SetQueryParams(args.Params)
+
+					req.SetBody(base.Json{
+						"key":     u.Key,
+						"node_id": file.GetID(),
+					})
+
+					// 设置 header
+					if args.Header != nil {
+						for k, vs := range args.Header {
+							for _, v := range vs {
+								req.SetHeader(k, v) // resty 只接受 key-value
+							}
+						}
+					}
+
+				}, &r)
+				if err != nil {
+					return nil, err
+				}
+
+				downloadUrl = r.Data.OriginalMediaInfo.MainURL
+			default:
+				var r GetFileUrlResp
+				_, err := d.request("/alice/message/get_file_url", http.MethodPost, func(req *resty.Request) {
+					req.SetBody(base.Json{
+						"uris": []string{u.Key},
+						"type": FileNodeType[u.NodeType],
+					})
+				}, &r)
+				if err != nil {
+					return nil, err
+				}
+
+				downloadUrl = r.Data.FileUrls[0].MainURL
+			}
+			// 将结果写入 Redis，设置过期时间，例如 24 小时
+			_ = db.RedisSet(redisKey, downloadUrl, 24*time.Hour)
+		case "get_file_info":
 			switch u.NodeType {
 			case VideoType, AudioType:
 				// 把 key 和 node_id 拼接成一个字符串
-				downloadUrl = fmt.Sprintf("key=%s&node_id=%s", u.Key, file.GetID())
+				downloadUrl = fmt.Sprintf("/?key=%s&node_id=%s", u.Key, file.GetID())
 				// 打印返回日志
-				fmt.Printf("get_file_url resp: %s\n", string(downloadUrl))
+				// fmt.Printf("get_file_info resp: %s\n", string(downloadUrl))
 			default:
 				var r GetFileUrlResp
 				_, err := d.request("/alice/message/get_file_url", http.MethodPost, func(req *resty.Request) {

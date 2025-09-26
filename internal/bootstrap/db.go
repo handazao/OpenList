@@ -86,4 +86,5 @@ func InitDB() {
 		log.Fatalf("failed to connect database:%s", err.Error())
 	}
 	db.Init(dB)
+	db.InitFromConfig(conf.Conf.Redis)
 }
