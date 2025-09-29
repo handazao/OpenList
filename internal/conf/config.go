@@ -131,6 +131,22 @@ type Config struct {
 	FTP                   FTP         `json:"ftp" envPrefix:"FTP_"`
 	SFTP                  SFTP        `json:"sftp" envPrefix:"SFTP_"`
 	LastLaunchedVersion   string      `json:"last_launched_version"`
+	Redis                 Redis       `json:"redis" envPrefix:"doubao_"`
+}
+type RedisPool struct {
+	MinIdle   int `json:"min_idle" env:"MIN_IDLE"`
+	MaxIdle   int `json:"max_idle" env:"MAX_IDLE"`
+	MaxActive int `json:"max_active" env:"MAX_ACTIVE"`
+	MaxWait   int `json:"max_wait" env:"MAX_WAIT"`
+}
+
+type Redis struct {
+	Host     string    `json:"host" env:"HOST"`
+	Port     int       `json:"port" env:"PORT"`
+	Database int       `json:"database" env:"DATABASE"`
+	Password string    `json:"password" env:"PASSWORD"`
+	Timeout  int       `json:"timeout" env:"TIMEOUT"`
+	Pool     RedisPool `json:"pool" envPrefix:"POOL_"`
 	ProxyAddress          string      `json:"proxy_address" env:"PROXY_ADDRESS"`
 	Redis                 Redis       `json:"redis" envPrefix:"doubao_"`
 }
