@@ -71,18 +71,60 @@ const (
 func (d *Doubao) request(path string, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
 	reqUrl := BaseURL + path
 	req := base.RestyClient.R()
-	req.SetHeader("Cookie", d.Cookie)
+
+	if d.limiter != nil {
+		waitStart := time.Now()
+		if err := d.limiter.Wait(context.Background()); err != nil {
+			return nil, err
+		}
+		log.Println("limiter waited:", time.Since(waitStart))
+	}
+
+	d.Header = utils.RemarkToHeader(d.Storage.Remark)
+	d.Params = utils.RemarkToParam(d.Storage.Remark)
+	// 设置 header
+	if d.Header != nil {
+		for k, vs := range d.Header {
+			for _, v := range vs {
+				req.SetHeader(k, v) // resty 只接受 key-value
+			}
+		}
+	}
+	// 默认设置 Cookie
+	if d.Cookie != "" {
+		req.SetHeader("Cookie", d.Cookie)
+	}
+	// QueryParams 参数
+	if d.Params != nil && len(d.Params) > 0 {
+		req.SetQueryParams(d.Params)
+	}
+	// 如果调用方有额外处理，则执行
 	if callback != nil {
 		callback(req)
 	}
 
+	// 打印请求信息（手动日志，方便排查）
+	// log.Infof(">>> Request >>>")
+	// log.Infof("URL: %s", reqUrl)
+	// log.Infof("Method: %s", method)
+	// log.Infof("Headers: %+v", req.Header)
+	if req.Body != nil {
+		// log.Infof("Body: %+v", req.Body)
+	}
+
 	var commonResp CommonResp
 
+	// 发送请求
+	start := time.Now()
 	res, err := req.Execute(method, reqUrl)
 	log.Debugln(res.String())
 	if err != nil {
 		return nil, err
 	}
+
+	log.Println("request done:", d.DownloadApi, "time:", time.Since(start))
+	// Debug 打印响应
+	log.Debugln("Response:", res.String())
 
 	body := res.Body()
 	// 先解析为通用响应

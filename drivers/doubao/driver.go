@@ -3,18 +3,21 @@ package doubao
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
+	"github.com/OpenListTeam/OpenList/v4/internal/db"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
+	"golang.org/x/time/rate"
 )
 
 type Doubao struct {
@@ -23,6 +26,7 @@ type Doubao struct {
 	*UploadToken
 	UserId       string
 	uploadThread int
+	limiter      *rate.Limiter // 限速器
 }
 
 func (d *Doubao) Config() driver.Config {
@@ -42,6 +46,16 @@ func (d *Doubao) Init(ctx context.Context) error {
 	} else {
 		d.uploadThread = uploadThread
 	}
+
+	// 初始化限速器
+	// 可以从 Addition.RateLimit 获取配置，如果没有，就用默认值
+	qps := 1 // 默认每秒 5 个请求
+	if rl, ok := interface{}(d.Addition).(interface{ GetRateLimit() string }); ok {
+		if v, err := strconv.Atoi(rl.GetRateLimit()); err == nil && v > 0 {
+			qps = v
+		}
+	}
+	d.limiter = rate.NewLimiter(rate.Limit(qps), qps) // 突发数设为 qps
 
 	if d.UserId == "" {
 		userInfo, err := d.getUserInfo()
@@ -112,6 +126,21 @@ func (d *Doubao) Link(ctx context.Context, file model.Obj, args model.LinkArgs) 
 
 			downloadUrl = r.Data.DownloadInfos[0].MainURL
 		case "get_file_url":
+			if db.IsRedisEnabled() == true {
+				var redisKey = "file_url:" + u.Key
+				// 先尝试从 Redis 获取
+				downloadUrl, err := db.RedisGet(redisKey)
+				if err != nil {
+					fmt.Printf("redis get file url err: %v\n", err)
+					//return nil, err
+				}
+
+				if downloadUrl != "" {
+					// Redis 有缓存，直接返回
+					return &model.Link{URL: downloadUrl}, nil
+				}
+			}
+
 			switch u.NodeType {
 			case VideoType, AudioType:
 				var r GetVideoFileUrlResp
@@ -140,13 +169,40 @@ func (d *Doubao) Link(ctx context.Context, file model.Obj, args model.LinkArgs) 
 
 				downloadUrl = r.Data.FileUrls[0].MainURL
 			}
+			if db.IsRedisEnabled() == true {
+				var redisKey = "file_url:" + u.Key
+				// 将结果写入 Redis，设置过期时间，例如 24 小时
+				_ = db.RedisSet(redisKey, downloadUrl, 24*time.Hour)
+			}
+		case "get_file_info":
+			switch u.NodeType {
+			case VideoType, AudioType:
+				// 把 key 和 node_id 拼接成一个字符串
+				downloadUrl = fmt.Sprintf("/?key=%s&node_id=%s", u.Key, file.GetID())
+				// 打印返回日志
+				// fmt.Printf("get_file_info resp: %s\n", string(downloadUrl))
+			default:
+				var r GetFileUrlResp
+				_, err := d.request("/alice/message/get_file_url", http.MethodPost, func(req *resty.Request) {
+					req.SetBody(base.Json{
+						"uris": []string{u.Key},
+						"type": FileNodeType[u.NodeType],
+					})
+				}, &r)
+				if err != nil {
+					return nil, err
+				}
+
+				downloadUrl = r.Data.FileUrls[0].MainURL
+			}
 		default:
 			return nil, errs.NotImplement
 		}
 
 		// 生成标准的Content-Disposition
 		contentDisposition := utils.GenerateContentDisposition(u.Name)
-
+		// 打印返回日志
+		fmt.Printf("model Link resp: %s\n", downloadUrl)
 		return &model.Link{
 			URL: downloadUrl,
 			Header: http.Header{

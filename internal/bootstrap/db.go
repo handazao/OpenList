@@ -86,4 +86,9 @@ func InitDB() {
 		log.Fatalf("failed to connect database:%s", err.Error())
 	}
 	db.Init(dB)
+	// 使用方式
+	if conf.Conf.Redis.Host != "" {
+		log.Infof("启用 redis host: %s", conf.Conf.Redis.Host)
+		db.InitFromConfig(conf.Conf.Redis)
+	}
 }

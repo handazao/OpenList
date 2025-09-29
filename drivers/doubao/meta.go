@@ -1,6 +1,8 @@
 package doubao
 
 import (
+	"net/http"
+
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/op"
 )
@@ -13,6 +15,8 @@ type Addition struct {
 	Cookie       string `json:"cookie" type:"text"`
 	UploadThread string `json:"upload_thread" default:"3"`
 	DownloadApi  string `json:"download_api" type:"select" options:"get_file_url,get_download_info" default:"get_file_url"`
+	Header       http.Header
+	Params       map[string]string
 }
 
 var config = driver.Config{
