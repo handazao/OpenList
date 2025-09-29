@@ -37,6 +37,29 @@ func NewRestyClient() *resty.Client {
 		SetRetryCount(3).
 		SetRetryResetReaders(true).
 		SetTimeout(DefaultTimeout).
+		SetTLSClientConfig(&tls.Config{InsecureSkipVerify: conf.Conf.TlsInsecureSkipVerify}).
+		SetDebug(false) // 开启调试日志
+
+	// 请求前打印
+	client.OnBeforeRequest(func(c *resty.Client, req *resty.Request) error {
+		// log.Infof(">>> Request >>>")
+		// log.Infof("URL: %s", req.URL)
+		// log.Infof("Method: %s", req.Method)
+		// log.Infof("Headers: %+v", req.Header)
+		if req.Body != nil {
+			// log.Infof("Body: %+v", req.Body)
+		}
+		return nil
+	})
+
+	// 响应后打印
+	client.OnAfterResponse(func(c *resty.Client, resp *resty.Response) error {
+		// log.Infof("<<< Response <<<")
+		// log.Infof("Status: %d", resp.StatusCode())
+		// log.Infof("Body: %s", resp.String())
+		return nil
+	})
+
 		SetTLSClientConfig(&tls.Config{InsecureSkipVerify: conf.Conf.TlsInsecureSkipVerify})
 
 	net.SetRestyProxyIfConfigured(client)
