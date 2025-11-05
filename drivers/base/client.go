@@ -37,6 +37,9 @@ func NewRestyClient() *resty.Client {
 		SetRetryCount(3).
 		SetRetryResetReaders(true).
 		SetTimeout(DefaultTimeout).
+		SetTLSClientConfig(&tls.Config{InsecureSkipVerify: conf.Conf.TlsInsecureSkipVerify})
+
+	net.SetRestyProxyIfConfigured(client)
 		SetTLSClientConfig(&tls.Config{InsecureSkipVerify: conf.Conf.TlsInsecureSkipVerify}).
 		SetDebug(false) // 开启调试日志
 
