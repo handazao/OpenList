@@ -40,8 +40,6 @@ func NewRestyClient() *resty.Client {
 		SetTLSClientConfig(&tls.Config{InsecureSkipVerify: conf.Conf.TlsInsecureSkipVerify})
 
 	net.SetRestyProxyIfConfigured(client)
-		SetTLSClientConfig(&tls.Config{InsecureSkipVerify: conf.Conf.TlsInsecureSkipVerify}).
-		SetDebug(false) // 开启调试日志
 
 	// 请求前打印
 	client.OnBeforeRequest(func(c *resty.Client, req *resty.Request) error {
