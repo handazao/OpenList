@@ -131,6 +131,7 @@ type Config struct {
 	FTP                   FTP         `json:"ftp" envPrefix:"FTP_"`
 	SFTP                  SFTP        `json:"sftp" envPrefix:"SFTP_"`
 	LastLaunchedVersion   string      `json:"last_launched_version"`
+	ProxyAddress          string      `json:"proxy_address" env:"PROXY_ADDRESS"`
 	Redis                 Redis       `json:"redis" envPrefix:"doubao_"`
 }
 type RedisPool struct {
@@ -273,5 +274,6 @@ func DefaultConfig(dataDir string) *Config {
 			},
 		},
 		LastLaunchedVersion: "",
+		ProxyAddress:        "",
 	}
 }
