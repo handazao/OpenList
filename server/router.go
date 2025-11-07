@@ -80,6 +80,7 @@ func Init(e *gin.Engine) {
 	auth.POST("/auth/2fa/generate", handles.Generate2FA)
 	auth.POST("/auth/2fa/verify", handles.Verify2FA)
 	auth.GET("/auth/logout", handles.LogOut)
+	auth.POST("/auth/ai", getAiConfig)
 
 	// auth
 	api.GET("/auth/sso", handles.SSOLoginRedirect)
