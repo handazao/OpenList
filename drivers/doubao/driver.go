@@ -75,6 +75,17 @@ func (d *Doubao) Init(ctx context.Context) error {
 		d.UploadToken = uploadToken
 	}
 
+	if d.LimitRate > 0 {
+		d.limiter = rate.NewLimiter(rate.Limit(d.LimitRate), 1)
+	}
+
+	return nil
+}
+
+func (d *Doubao) WaitLimit(ctx context.Context) error {
+	if d.limiter != nil {
+		return d.limiter.Wait(ctx)
+	}
 	return nil
 }
 
@@ -83,6 +94,10 @@ func (d *Doubao) Drop(ctx context.Context) error {
 }
 
 func (d *Doubao) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([]model.Obj, error) {
+	if err := d.WaitLimit(ctx); err != nil {
+		return nil, err
+	}
+
 	var files []model.Obj
 	fileList, err := d.getFiles(dir.GetID(), "")
 	if err != nil {
@@ -109,6 +124,10 @@ func (d *Doubao) List(ctx context.Context, dir model.Obj, args model.ListArgs) (
 }
 
 func (d *Doubao) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
+	if err := d.WaitLimit(ctx); err != nil {
+		return nil, err
+	}
+
 	var downloadUrl string
 
 	if u, ok := file.(*Object); ok {
@@ -216,6 +235,10 @@ func (d *Doubao) Link(ctx context.Context, file model.Obj, args model.LinkArgs) 
 }
 
 func (d *Doubao) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) error {
+	if err := d.WaitLimit(ctx); err != nil {
+		return err
+	}
+
 	var r UploadNodeResp
 	_, err := d.request("/samantha/aispace/upload_node", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(base.Json{
@@ -233,6 +256,10 @@ func (d *Doubao) MakeDir(ctx context.Context, parentDir model.Obj, dirName strin
 }
 
 func (d *Doubao) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
+	if err := d.WaitLimit(ctx); err != nil {
+		return err
+	}
+
 	var r UploadNodeResp
 	_, err := d.request("/samantha/aispace/move_node", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(base.Json{
@@ -247,6 +274,10 @@ func (d *Doubao) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
 }
 
 func (d *Doubao) Rename(ctx context.Context, srcObj model.Obj, newName string) error {
+	if err := d.WaitLimit(ctx); err != nil {
+		return err
+	}
+
 	var r BaseResp
 	_, err := d.request("/samantha/aispace/rename_node", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(base.Json{
@@ -263,6 +294,10 @@ func (d *Doubao) Copy(ctx context.Context, srcObj, dstDir model.Obj) (model.Obj,
 }
 
 func (d *Doubao) Remove(ctx context.Context, obj model.Obj) error {
+	if err := d.WaitLimit(ctx); err != nil {
+		return err
+	}
+
 	var r BaseResp
 	_, err := d.request("/samantha/aispace/delete_node", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(base.Json{"node_list": []base.Json{{"id": obj.GetID()}}})
@@ -271,6 +306,10 @@ func (d *Doubao) Remove(ctx context.Context, obj model.Obj) error {
 }
 
 func (d *Doubao) Put(ctx context.Context, dstDir model.Obj, file model.FileStreamer, up driver.UpdateProgress) (model.Obj, error) {
+	if err := d.WaitLimit(ctx); err != nil {
+		return nil, err
+	}
+
 	// 根据MIME类型确定数据类型
 	mimetype := file.GetMimetype()
 	dataType := FileDataType
